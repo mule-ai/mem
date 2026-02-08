@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Building version: ${VERSION}"
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          go test -v -race ./...
+
+      - name: Build release binaries
+        run: |
+          echo "Building release binaries for version ${VERSION}..."
+          mkdir -p release
+          
+          # Build for Linux amd64
+          echo "Building for Linux amd64..."
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-linux-amd64 ./cmd/mem
+          
+          # Build for Linux arm64
+          echo "Building for Linux arm64..."
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-linux-arm64 ./cmd/mem
+          
+          # Build for macOS amd64 (Intel)
+          echo "Building for macOS amd64..."
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-darwin-amd64 ./cmd/mem
+          
+          # Build for macOS arm64 (Apple Silicon)
+          echo "Building for macOS arm64..."
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-darwin-arm64 ./cmd/mem
+          
+          # Create universal macOS binary (fat binary)
+          echo "Creating universal macOS binary..."
+          lipo -create -output release/mem-darwin-universal release/mem-darwin-amd64 release/mem-darwin-arm64 || echo "Warning: Could not create universal binary"
+          
+          # Build for Windows amd64
+          echo "Building for Windows amd64..."
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-windows-amd64.exe ./cmd/mem
+          
+          # Generate checksums
+          cd release
+          sha256sum * > checksums.txt
+          cd ..
+          
+          echo "Release binaries built:"
+          ls -lh release/
+
+      - name: Create archives
+        run: |
+          cd release
+          
+          # Create tar.gz for Unix-like systems
+          tar -czf mem-linux-amd64.tar.gz mem-linux-amd64
+          tar -czf mem-linux-arm64.tar.gz mem-linux-arm64
+          tar -czf mem-darwin-amd64.tar.gz mem-darwin-amd64
+          tar -czf mem-darwin-arm64.tar.gz mem-darwin-arm64
+          if [ -f mem-darwin-universal ]; then
+            tar -czf mem-darwin-universal.tar.gz mem-darwin-universal
+          fi
+          
+          # Create zip for Windows
+          zip mem-windows-amd64.zip mem-windows-amd64.exe
+          
+          # Add checksums to archives
+          sha256sum *.tar.gz *.zip >> checksums.txt
+          
+          ls -lh
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## mem v${VERSION}
+
+          ### Installation
+          
+          \`\`\`bash
+          # Linux (amd64)
+          curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-linux-amd64"
+          chmod +x mem
+          sudo mv mem /usr/local/bin/
+          
+          # macOS (Intel)
+          curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-darwin-amd64"
+          chmod +x mem
+          sudo mv mem /usr/local/bin/
+          
+          # macOS (Apple Silicon)
+          curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-darwin-arm64"
+          chmod +x mem
+          sudo mv mem /usr/local/bin/
+          
+          # Windows (PowerShell)
+          Invoke-WebRequest -OutFile mem.exe "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-windows-amd64.exe"
+          \`\`\`
+          
+          ### Verify Checksums
+          
+          \`\`\`bash
+          # Download and verify
+          curl -L -O "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/checksums.txt"
+          sha256sum -c checksums.txt
+          \`\`\`
+          
+          ### What's Changed
+          
+          See [CHANGELOG.md](https://github.com/jbutlerdev/mem/blob/main/CHANGELOG.md) for details.
+          EOF
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: mem ${{ env.VERSION }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release/mem-*.tar.gz
+            release/mem-*.zip
+            release/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binaries as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mem-${{ env.VERSION }}
+          path: release/
+          retention-days: 30
