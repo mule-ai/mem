@@ -87,41 +87,41 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: |
-          cat > release_notes.md << 'EOF'
-          ## mem v${VERSION}
+          cat > release_notes.md << EOF
+          ## mem ${VERSION}
 
           ### Installation
-          
+
           \`\`\`bash
           # Linux (amd64)
           curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-linux-amd64"
           chmod +x mem
           sudo mv mem /usr/local/bin/
-          
+
           # macOS (Intel)
           curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-darwin-amd64"
           chmod +x mem
           sudo mv mem /usr/local/bin/
-          
+
           # macOS (Apple Silicon)
           curl -L -o mem "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-darwin-arm64"
           chmod +x mem
           sudo mv mem /usr/local/bin/
-          
+
           # Windows (PowerShell)
           Invoke-WebRequest -OutFile mem.exe "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/mem-windows-amd64.exe"
           \`\`\`
-          
+
           ### Verify Checksums
-          
+
           \`\`\`bash
           # Download and verify
           curl -L -O "https://github.com/jbutlerdev/mem/releases/download/${VERSION}/checksums.txt"
           sha256sum -c checksums.txt
           \`\`\`
-          
+
           ### What's Changed
-          
+
           See [CHANGELOG.md](https://github.com/jbutlerdev/mem/blob/main/CHANGELOG.md) for details.
           EOF
           cat release_notes.md
