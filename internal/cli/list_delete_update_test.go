@@ -139,8 +139,8 @@ func TestListCmd(t *testing.T) {
 		if ListCmd.Use != "list" {
 			t.Errorf("Expected use 'list', got '%s'", ListCmd.Use)
 		}
-		if ListCmd.Short != "List stored memories" {
-			t.Errorf("Expected short description 'List stored memories', got '%s'", ListCmd.Short)
+		if ListCmd.Short != "List all stored memories" {
+			t.Errorf("Expected short description 'List all stored memories', got '%s'", ListCmd.Short)
 		}
 	})
 

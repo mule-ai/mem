@@ -13,8 +13,8 @@ func TestExportCmdExists(t *testing.T) {
 		if ExportCmd.Use != "export [output_file]" {
 			t.Errorf("Expected use 'export [output_file]', got '%s'", ExportCmd.Use)
 		}
-		if ExportCmd.Short != "Export memories to a file" {
-			t.Errorf("Expected short description 'Export memories to a file', got '%s'", ExportCmd.Short)
+		if ExportCmd.Short != "Export memories to a file for backup" {
+			t.Errorf("Expected short description 'Export memories to a file for backup', got '%s'", ExportCmd.Short)
 		}
 	})
 
@@ -44,8 +44,8 @@ func TestImportCmdExists(t *testing.T) {
 		if ImportCmd.Use != "import <input_file>" {
 			t.Errorf("Expected use 'import <input_file>', got '%s'", ImportCmd.Use)
 		}
-		if ImportCmd.Short != "Import memories from a file" {
-			t.Errorf("Expected short description 'Import memories from a file', got '%s'", ImportCmd.Short)
+		if ImportCmd.Short != "Import memories from a backup file" {
+			t.Errorf("Expected short description 'Import memories from a backup file', got '%s'", ImportCmd.Short)
 		}
 	})
 

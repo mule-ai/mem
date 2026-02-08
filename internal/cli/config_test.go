@@ -15,8 +15,8 @@ func TestConfigCmdExists(t *testing.T) {
 		if ConfigCmd.Use != "config [command]" {
 			t.Errorf("Expected use 'config [command]', got '%s'", ConfigCmd.Use)
 		}
-		if ConfigCmd.Short != "Manage configuration" {
-			t.Errorf("Expected short description 'Manage configuration', got '%s'", ConfigCmd.Short)
+		if ConfigCmd.Short != "Manage mem configuration" {
+			t.Errorf("Expected short description 'Manage mem configuration', got '%s'", ConfigCmd.Short)
 		}
 	})
 
@@ -61,8 +61,8 @@ func TestConfigShowCmd(t *testing.T) {
 		if showCmd.Use != "show" {
 			t.Errorf("Expected use 'show', got '%s'", showCmd.Use)
 		}
-		if showCmd.Short != "Show current configuration" {
-			t.Errorf("Expected short 'Show current configuration', got '%s'", showCmd.Short)
+		if showCmd.Short != "Show current effective configuration" {
+			t.Errorf("Expected short 'Show current effective configuration', got '%s'", showCmd.Short)
 		}
 	})
 }

@@ -19,8 +19,8 @@ func TestImportCmd(t *testing.T) {
 		if ImportCmd.Use != "import <input_file>" {
 			t.Errorf("Expected use 'import <input_file>', got '%s'", ImportCmd.Use)
 		}
-		if ImportCmd.Short != "Import memories from a file" {
-			t.Errorf("Expected short description 'Import memories from a file', got '%s'", ImportCmd.Short)
+		if ImportCmd.Short != "Import memories from a backup file" {
+			t.Errorf("Expected short description 'Import memories from a backup file', got '%s'", ImportCmd.Short)
 		}
 	})
 
@@ -50,8 +50,8 @@ func TestExportCmd(t *testing.T) {
 		if ExportCmd.Use != "export [output_file]" {
 			t.Errorf("Expected use 'export [output_file]', got '%s'", ExportCmd.Use)
 		}
-		if ExportCmd.Short != "Export memories to a file" {
-			t.Errorf("Expected short description 'Export memories to a file', got '%s'", ExportCmd.Short)
+		if ExportCmd.Short != "Export memories to a file for backup" {
+			t.Errorf("Expected short description 'Export memories to a file for backup', got '%s'", ExportCmd.Short)
 		}
 	})
 
@@ -81,8 +81,8 @@ func TestNamespaceCmd(t *testing.T) {
 		if NamespaceCmd.Use != "namespace [command]" {
 			t.Errorf("Expected use 'namespace [command]', got '%s'", NamespaceCmd.Use)
 		}
-		if NamespaceCmd.Short != "Manage namespaces" {
-			t.Errorf("Expected short description 'Manage namespaces', got '%s'", NamespaceCmd.Short)
+		if NamespaceCmd.Short != "Manage memory namespaces" {
+			t.Errorf("Expected short description 'Manage memory namespaces', got '%s'", NamespaceCmd.Short)
 		}
 	})
 
@@ -368,8 +368,8 @@ func TestConfigCmd(t *testing.T) {
 		if ConfigCmd.Use != "config [command]" {
 			t.Errorf("Expected use 'config [command]', got '%s'", ConfigCmd.Use)
 		}
-		if ConfigCmd.Short != "Manage configuration" {
-			t.Errorf("Expected short description 'Manage configuration', got '%s'", ConfigCmd.Short)
+		if ConfigCmd.Short != "Manage mem configuration" {
+			t.Errorf("Expected short description 'Manage mem configuration', got '%s'", ConfigCmd.Short)
 		}
 	})
 

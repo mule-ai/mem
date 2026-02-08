@@ -219,8 +219,8 @@ func TestStoreCmdBasic(t *testing.T) {
 		if StoreCmd.Use != "store [content]" {
 			t.Errorf("Expected use 'store [content]', got '%s'", StoreCmd.Use)
 		}
-		if StoreCmd.Short != "Store a new memory" {
-			t.Errorf("Expected short description 'Store a new memory', got '%s'", StoreCmd.Short)
+		if StoreCmd.Short != "Store a new memory in semantic memory" {
+			t.Errorf("Expected short description 'Store a new memory in semantic memory', got '%s'", StoreCmd.Short)
 		}
 	})
 

@@ -15,8 +15,8 @@ func TestNamespaceCmdExists(t *testing.T) {
 		if NamespaceCmd.Use != "namespace [command]" {
 			t.Errorf("Expected use 'namespace [command]', got '%s'", NamespaceCmd.Use)
 		}
-		if NamespaceCmd.Short != "Manage namespaces" {
-			t.Errorf("Expected short description 'Manage namespaces', got '%s'", NamespaceCmd.Short)
+		if NamespaceCmd.Short != "Manage memory namespaces" {
+			t.Errorf("Expected short description 'Manage memory namespaces', got '%s'", NamespaceCmd.Short)
 		}
 	})
 

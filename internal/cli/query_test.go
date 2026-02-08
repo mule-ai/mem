@@ -19,8 +19,8 @@ func TestQueryCmdBasic(t *testing.T) {
 		if QueryCmd.Use != "query [query]" {
 			t.Errorf("Expected use 'query [query]', got '%s'", QueryCmd.Use)
 		}
-		if QueryCmd.Short != "Query memories using semantic search" {
-			t.Errorf("Expected short description 'Query memories using semantic search', got '%s'", QueryCmd.Short)
+		if QueryCmd.Short != "Search memories using semantic search" {
+			t.Errorf("Expected short description 'Search memories using semantic search', got '%s'", QueryCmd.Short)
 		}
 	})
 
