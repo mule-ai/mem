@@ -1,0 +1,59 @@
+# Binaries
+bin/
+mem
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Configuration backups
+backup.json
+work-backup.json
+
+# Local configuration (may contain sensitive data)
+.memconfig
+*.local.yaml
+
+# Data directory
+.mem/
+
+# Log files
+*.log
+
+# Build artifacts
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local

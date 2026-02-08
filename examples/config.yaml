@@ -1,0 +1,75 @@
+# mem Configuration Example
+# Copy this to ~/.mem/config.yaml and customize as needed
+
+# Memory storage configuration
+memory:
+  # Directory for chromem-go database storage
+  path: ~/.mem/data
+  
+  # Default namespace for memories
+  default_namespace: default
+  
+  # Storage backend: chromem | postgres
+  backend: chromem
+  
+  # PostgreSQL configuration (only used when backend=postgres)
+  postgres:
+    host: localhost
+    port: 5432
+    database: mem
+    user: postgres
+    password: ""
+    sslmode: disable
+
+# Embedding provider configuration
+embeddings:
+  # API endpoint (LM Studio for local development)
+  base_url: http://10.10.199.29:8080
+  
+  # Embedding model
+  model: text-embedding-qwen3-embedding-8b
+  
+  # API key (optional for local deployments)
+  api_key: ""
+  
+  # Embedding dimensions (check model documentation)
+  dimensions: 1024
+  
+  # Batch size for embedding requests (performance tuning)
+  batch_size: 10
+
+# Re-ranking configuration
+reranking:
+  # Enable/disable re-ranking
+  enabled: true
+  
+  # Reranker model to use
+  model: qwen3-reranker-8b
+  
+  # Number of top results to re-rank
+  top_k: 10
+  
+  # Minimum relevance threshold for re-ranked results
+  threshold: 0.5
+
+# Query behavior defaults
+query:
+  # Default number of results to return
+  default_limit: 5
+  
+  # Minimum similarity threshold (0-1)
+  min_similarity: 0.6
+  
+  # Enable re-ranking by default
+  rerank_enabled: true
+
+# CLI behavior
+cli:
+  # Output format: text | json | yaml
+  output_format: text
+  
+  # Enable verbose logging
+  verbose: false
+  
+  # Color output (true | false | auto)
+  color: auto
