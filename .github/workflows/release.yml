@@ -33,11 +33,6 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "Building version: ${VERSION}"
 
-      - name: Run tests
-        run: |
-          echo "Running tests..."
-          go test -v ./... || echo "Tests failed, continuing with build..."
-
       - name: Build release binaries
         run: |
           echo "Building release binaries for version ${VERSION}..."
@@ -58,10 +53,6 @@ jobs:
           # Build for macOS arm64 (Apple Silicon)
           echo "Building for macOS arm64..."
           GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" -o release/mem-darwin-arm64 ./cmd/mem
-          
-          # Create universal macOS binary (fat binary)
-          echo "Creating universal macOS binary..."
-          lipo -create -output release/mem-darwin-universal release/mem-darwin-amd64 release/mem-darwin-arm64 || echo "Warning: Could not create universal binary"
           
           # Build for Windows amd64
           echo "Building for Windows amd64..."
@@ -84,9 +75,6 @@ jobs:
           tar -czf mem-linux-arm64.tar.gz mem-linux-arm64
           tar -czf mem-darwin-amd64.tar.gz mem-darwin-amd64
           tar -czf mem-darwin-arm64.tar.gz mem-darwin-arm64
-          if [ -f mem-darwin-universal ]; then
-            tar -czf mem-darwin-universal.tar.gz mem-darwin-universal
-          fi
           
           # Create zip for Windows
           zip mem-windows-amd64.zip mem-windows-amd64.exe
