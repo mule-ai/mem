@@ -105,6 +105,7 @@ func init() {
 	rootCmd.AddCommand(cli.ImportCmd)
 	rootCmd.AddCommand(cli.NamespaceCmd)
 	rootCmd.AddCommand(cli.ConfigCmd)
+	rootCmd.AddCommand(cli.RegenerateCmd)
 }
 
 func initConfig() {

@@ -34,11 +34,11 @@ type PostgresConfig struct {
 
 // EmbeddingsConfig contains embedding API settings
 type EmbeddingsConfig struct {
-	BaseURL    string `mapstructure:"base_url"`
+	BaseURL    string `mapstructure:"base_url,BaseURL,baseurl"`
 	Model      string `mapstructure:"model"`
-	APIKey     string `mapstructure:"api_key"`
-	Dimensions int    `mapstructure:"dimensions"`
-	BatchSize  int    `mapstructure:"batch_size"`
+	APIKey     string `mapstructure:"api_key,APIKey,apikey"`
+	Dimensions int    `mapstructure:"dimensions,Dimensions,dimensions"`
+	BatchSize  int    `mapstructure:"batch_size,BatchSize,batchsize"`
 }
 
 // RerankingConfig contains reranker settings
@@ -69,7 +69,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Memory: MemoryConfig{
 			Path:             filepath.Join(homeDir, ".mem", "data"),
-			DefaultNamespace: "default",
+			// No default namespace - empty means all namespaces
 			Backend:          "chromem",
 			Postgres: PostgresConfig{
 				Host:     "localhost",

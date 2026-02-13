@@ -88,9 +88,8 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	if namespace == "" {
 		namespace = cfg.Memory.DefaultNamespace
 	}
-	if namespace == "" {
-		namespace = "default"
-	}
+	// If namespace is still empty, don't default to "default"
+	// Leave it empty to search all namespaces
 
 	// Apply config defaults
 	limit := queryLimit
@@ -170,7 +169,11 @@ func runQuery(cmd *cobra.Command, args []string) error {
 
 	// Execute vector search
 	if cfg.CLI.Verbose {
-		fmt.Fprintf(os.Stderr, "Searching for memories (top %d)...\n", initialTop)
+		if namespace != "" {
+			fmt.Fprintf(os.Stderr, "Searching for memories in namespace '%s' (top %d)...\n", namespace, initialTop)
+		} else {
+			fmt.Fprintf(os.Stderr, "Searching for memories in all namespaces (top %d)...\n", initialTop)
+		}
 	}
 
 	queryOpts := &storage.QueryOptions{

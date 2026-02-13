@@ -91,7 +91,7 @@ func setDefaults(v *viper.Viper) {
 
 	// Memory defaults
 	v.SetDefault("memory.path", filepath.Join(homeDir, ".mem", "data"))
-	v.SetDefault("memory.default_namespace", "default")
+	// Don't set a default for default_namespace - empty means all namespaces
 	v.SetDefault("memory.backend", "chromem")
 	v.SetDefault("memory.postgres.host", "localhost")
 	v.SetDefault("memory.postgres.port", 5432)
@@ -106,6 +106,19 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.api_key", "")
 	v.SetDefault("embeddings.dimensions", 1024)
 	v.SetDefault("embeddings.batch_size", 10)
+
+	// Register aliases for camelCase keys (in case config uses baseurl instead of base_url)
+	v.RegisterAlias("embeddings.base_url", "embeddings.baseurl")
+	v.RegisterAlias("embeddings.api_key", "embeddings.apikey")
+	v.RegisterAlias("embeddings.batch_size", "embeddings.batchsize")
+	v.RegisterAlias("memory.default_namespace", "memory.defaultnamespace")
+	v.RegisterAlias("memory.backend", "memory.backend")
+	v.RegisterAlias("query.default_limit", "query.defaultlimit")
+	v.RegisterAlias("query.min_similarity", "query.minsimilarity")
+	v.RegisterAlias("query.rerank_enabled", "query.rerankenabled")
+	v.RegisterAlias("reranking.enabled", "reranking.enabled")
+	v.RegisterAlias("reranking.top_k", "reranking.topk")
+	v.RegisterAlias("cli.output_format", "cli.outputformat")
 
 	// Reranking defaults
 	v.SetDefault("reranking.enabled", true)

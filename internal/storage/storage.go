@@ -30,6 +30,10 @@ type Storage interface {
 	// If content changes, a new embedding should be provided
 	Update(memory *models.Memory) error
 
+	// UpdateEmbedding updates only the embedding for an existing memory
+	// This is useful when regenerating embeddings with a new model
+	UpdateEmbedding(id string, embedding []float32) error
+
 	// Delete removes a memory by its ID
 	Delete(id string) error
 
@@ -39,6 +43,10 @@ type Storage interface {
 	// List retrieves memories with optional filtering
 	// Namespace can be empty string for all namespaces, tag can be empty for no tag filter
 	List(namespace string, tag string, limit int) ([]*models.Memory, error)
+
+	// GetAll returns all memories regardless of embedding dimension
+	// This is useful for regeneration when embeddings may be corrupted
+	GetAll() ([]*models.Memory, error)
 
 	// ListNamespaces returns all namespaces
 	ListNamespaces() ([]NamespaceInfo, error)

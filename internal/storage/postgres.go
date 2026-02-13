@@ -396,6 +396,58 @@ func (s *PostgresStorage) GetByTag(tag string) ([]*models.Memory, error) {
 	return s.List("", tag, 10000)
 }
 
+// GetAll returns all memories regardless of embedding dimension
+// This is useful for regeneration when embeddings may be corrupted
+func (s *PostgresStorage) GetAll() ([]*models.Memory, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Query all memories - we don't need the embedding for regeneration
+	query := `SELECT id, content, namespace, tags, metadata, created_at, updated_at FROM memories`
+	
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query memories: %w", err)
+	}
+	defer rows.Close()
+
+	var memories []*models.Memory
+	for rows.Next() {
+		var memory models.Memory
+		var tagsArray []string
+		var metadataJSON []byte
+		var createdAt, updatedAt time.Time
+
+		err := rows.Scan(
+			&memory.ID,
+			&memory.Content,
+			&memory.Namespace,
+			&tagsArray,
+			&metadataJSON,
+			&createdAt,
+			&updatedAt,
+		)
+		if err != nil {
+			continue
+		}
+
+		memory.Tags = tagsArray
+		memory.CreatedAt = createdAt
+		memory.UpdatedAt = updatedAt
+
+		if len(metadataJSON) > 0 {
+			json.Unmarshal(metadataJSON, &memory.Metadata)
+		}
+
+		// Create a zero embedding - it will be replaced during regeneration
+		memory.Embedding = make([]float32, s.embeddingDim)
+
+		memories = append(memories, &memory)
+	}
+
+	return memories, nil
+}
+
 // Update updates an existing memory
 func (s *PostgresStorage) Update(memory *models.Memory) error {
 	if err := memory.Validate(); err != nil {
@@ -459,6 +511,39 @@ func (s *PostgresStorage) Update(memory *models.Memory) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to update memory: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateEmbedding updates only the embedding for an existing memory
+// This is useful when regenerating embeddings with a new model
+func (s *PostgresStorage) UpdateEmbedding(id string, embedding []float32) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Convert embedding to vector format for pgvector
+	embeddingStr := s.embeddingToString(embedding)
+
+	// Update only the embedding
+	query := `
+		UPDATE memories
+		SET embedding = $1::vector, updated_at = $2
+		WHERE id = $3
+	`
+
+	result, err := s.db.ExecContext(ctx, query, embeddingStr, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update embedding: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("memory not found: %s", id)
 	}
 
 	return nil

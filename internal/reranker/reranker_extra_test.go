@@ -2,6 +2,7 @@ package reranker
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -106,44 +107,51 @@ func TestRerankWithEmptyDocuments(t *testing.T) {
 	}
 }
 
-// TestRerankWithRealAPI tests reranking with a mock API server
-func TestRerankWithRealAPI(t *testing.T) {
-	// Create a mock server
+// TestRerankWithMockAPI tests reranking with a mock chat/completions API server
+func TestRerankWithMockAPI(t *testing.T) {
+	// Create a mock server that simulates a reranker model
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/rerank" {
-			t.Errorf("Expected path '/v1/rerank', got '%s'", r.URL.Path)
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("Expected path '/v1/chat/completions', got '%s'", r.URL.Path)
 		}
 		
 		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST, got %s", r.Method)
 		}
 		
-		// Return a mock rerank response
+		// Verify it's a valid chat completion request
+		var req ChatCompletionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("Failed to decode request: %v", err)
+		}
+		
+		// Check that the prompt contains our documents
+		if len(req.Messages) == 0 {
+			t.Error("Expected messages in request")
+		}
+		
+		// Return a mock rerank response (JSON array format)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
-			"object": "list",
-			"model": "test-model",
-			"results": [
-				{
-					"index": 1,
-					"relevance_score": 0.95,
-					"document": {
-						"id": "doc2",
-						"text": "Content 2"
-					}
-				},
+			"id": "chatcmpl-test",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "qwen3-reranker-8b",
+			"choices": [
 				{
 					"index": 0,
-					"relevance_score": 0.75,
-					"document": {
-						"id": "doc1",
-						"text": "Content 1"
-					}
+					"message": {
+						"role": "assistant",
+						"content": "[{\"id\": \"doc2\", \"score\": 0.95}, {\"id\": \"doc1\", \"score\": 0.75}]"
+					},
+					"finish_reason": "stop"
 				}
 			],
 			"usage": {
-				"total_tokens": 100
+				"prompt_tokens": 100,
+				"completion_tokens": 50,
+				"total_tokens": 150
 			}
 		}`))
 	}))
@@ -151,6 +159,7 @@ func TestRerankWithRealAPI(t *testing.T) {
 	
 	config := Config{
 		BaseURL: server.URL,
+		Model:   "qwen3-reranker-8b",
 		Enabled: true,
 		TopK:    10,
 	}
@@ -171,7 +180,7 @@ func TestRerankWithRealAPI(t *testing.T) {
 		t.Fatalf("Expected 2 results, got %d", len(result))
 	}
 	
-	// Check that results are reranked correctly
+	// Check that results are reranked correctly (doc2 should be first with score 0.95)
 	if result[0].ID != "doc2" {
 		t.Errorf("Expected first result to be 'doc2', got '%s'", result[0].ID)
 	}
@@ -224,29 +233,31 @@ func TestRerankGracefulDegradation(t *testing.T) {
 
 // TestRerankWithThreshold tests filtering by threshold
 func TestRerankWithThreshold(t *testing.T) {
-	// Create a mock server
+	// Create a mock server that returns scores including one below threshold
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
-			"results": [
+			"id": "chatcmpl-test",
+			"object": "chat.completion",
+			"model": "qwen3-reranker-8b",
+			"choices": [
 				{
-					"index": 0,
-					"relevance_score": 0.9,
-					"document": {"id": "doc1", "text": "Content 1"}
-				},
-				{
-					"index": 1,
-					"relevance_score": 0.4,
-					"document": {"id": "doc2", "text": "Content 2"}
+					"message": {
+						"role": "assistant",
+						"content": "[{\"id\": \"doc1\", \"score\": 0.9}, {\"id\": \"doc2\", \"score\": 0.4}]"
+					},
+					"finish_reason": "stop"
 				}
-			]
+			],
+			"usage": {"total_tokens": 100}
 		}`))
 	}))
 	defer server.Close()
 	
 	config := Config{
 		BaseURL:   server.URL,
+		Model:     "qwen3-reranker-8b",
 		Enabled:   true,
 		Threshold: 0.5, // Filter out results below 0.5
 	}

@@ -2,7 +2,10 @@ package reranker
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/jbutlerdev/mem/pkg/api"
 )
@@ -28,35 +31,40 @@ type Client struct {
 	config    Config
 }
 
-// RerankRequest represents a request to rerank results
-type RerankRequest struct {
-	Model    string       `json:"model"`
-	Query    string       `json:"query"`
-	Documents []Document  `json:"documents"`
-	TopN     int          `json:"top_n,omitempty"`
+// ChatMessage represents a message in a chat completion request
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// ChatCompletionRequest represents a request to the chat/completions endpoint
+type ChatCompletionRequest struct {
+	Model    string        `json:"model"`
+	Messages []ChatMessage `json:"messages"`
+}
+
+// ChatCompletionResponse represents the response from the chat/completions API
+type ChatCompletionResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int    `json:"created"`
+	Model   string `json:"model"`
+	Choices []struct {
+		Index        int         `json:"index"`
+		Message      ChatMessage `json:"message"`
+		FinishReason string      `json:"finish_reason"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
 }
 
 // Document represents a document to be reranked
 type Document struct {
 	ID      string `json:"id"`
 	Content string `json:"text"`
-}
-
-// RerankResponse represents the response from the reranker API
-type RerankResponse struct {
-	Object string `json:"object"`
-	Model  string `json:"model"`
-	Results []Result `json:"results"`
-	Usage struct {
-		TotalTokens int `json:"total_tokens"`
-	} `json:"usage"`
-}
-
-// Result represents a single reranked result
-type Result struct {
-	Index          int     `json:"index"`
-	RelevanceScore float64 `json:"relevance_score"`
-	Document       Document `json:"document"`
 }
 
 // DocumentToRerank represents a document with its metadata before reranking
@@ -99,7 +107,7 @@ func NewClient(config Config) *Client {
 	}
 }
 
-// Rerank reranks the given documents based on the query
+// Rerank reranks the given documents based on the query using chat/completions
 func (c *Client) Rerank(ctx context.Context, query string, documents []DocumentToRerank) ([]RerankedDocument, error) {
 	if !c.config.Enabled {
 		// Reranking disabled, return original scores
@@ -110,72 +118,158 @@ func (c *Client) Rerank(ctx context.Context, query string, documents []DocumentT
 		return []RerankedDocument{}, nil
 	}
 
-	// Prepare request
-	docs := make([]Document, len(documents))
+	// Build the reranking prompt
+	// The model should output a JSON array of objects with id and score
+	prompt := c.buildRerankPrompt(query, documents)
+
+	req := ChatCompletionRequest{
+		Model: c.config.Model,
+		Messages: []ChatMessage{
+			{Role: "user", Content: prompt},
+		},
+	}
+
+	var resp ChatCompletionResponse
+	err := c.apiClient.Post(ctx, "/v1/chat/completions", req, &resp)
+	if err != nil {
+		log.Printf("Warning: reranking API call failed: %v", err)
+		return c.noopRerank(documents), nil
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		log.Printf("Warning: reranking API returned empty response")
+		return c.noopRerank(documents), nil
+	}
+
+	// Parse the model's response to extract rankings
+	reranked, err := c.parseRerankResponse(resp.Choices[0].Message.Content, documents)
+	if err != nil {
+		log.Printf("Warning: failed to parse rerank response: %v", err)
+		return c.noopRerank(documents), nil
+	}
+
+	return reranked, nil
+}
+
+// buildRerankPrompt creates a prompt for the reranker model
+func (c *Client) buildRerankPrompt(query string, documents []DocumentToRerank) string {
+	var sb strings.Builder
+	sb.WriteString("Given the following query and documents, rate each document's relevance to the query on a scale of 0-1.\n")
+	sb.WriteString("Output ONLY a valid JSON array with objects containing 'id' and 'score' fields.\n\n")
+	sb.WriteString("Query: " + query + "\n\n")
+	sb.WriteString("Documents:\n")
 	for i, doc := range documents {
-		docs[i] = Document{
-			ID:      doc.ID,
-			Content: doc.Content,
+		sb.WriteString(fmt.Sprintf("%d. [id: %s] %s\n", i+1, doc.ID, doc.Content))
+	}
+	sb.WriteString("\nRespond with a JSON array like: [{\"id\": \"doc1\", \"score\": 0.95}, {\"id\": \"doc2\", \"score\": 0.80}, ...]\n")
+	sb.WriteString("Only include documents that are at least somewhat relevant (score > 0.1).")
+	return sb.String()
+}
+
+// parseRerankResponse parses the model's response to extract reranking scores
+func (c *Client) parseRerankResponse(response string, documents []DocumentToRerank) ([]RerankedDocument, error) {
+	// Clean up the response
+	response = strings.TrimSpace(response)
+
+	// Remove markdown code blocks if present
+	response = strings.TrimPrefix(response, "```json")
+	response = strings.TrimPrefix(response, "```")
+	response = strings.TrimSuffix(response, "```")
+
+	// Try to find JSON array in response more carefully
+	// Look for the first '[' and last ']'
+	startIdx := -1
+	endIdx := -1
+	
+	for i, ch := range response {
+		if ch == '[' {
+			startIdx = i
+			break
 		}
 	}
-
-	req := RerankRequest{
-		Model:     c.config.Model,
-		Query:     query,
-		Documents: docs,
-		TopN:      len(docs), // Request all results back
+	
+	for i := len(response) - 1; i >= 0; i-- {
+		if response[i] == ']' {
+			endIdx = i
+			break
+		}
+	}
+	
+	if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
+		// Last resort: try to find any {...} or [...] pattern
+		return nil, fmt.Errorf("no JSON array found in response: %s", response[:min(len(response), 100)])
 	}
 
-	var resp RerankResponse
-	err := c.apiClient.Post(ctx, "/v1/rerank", req, &resp)
-	if err != nil {
-		// Graceful degradation: return original scores if reranking fails
-		// This handles cases where:
-		// - Reranking endpoint is not available (e.g., LM Studio without rerank support)
-		// - API is temporarily unreachable
-		// - Model is not loaded
-		log.Printf("Warning: reranking API call failed (endpoint may not be supported): %v", err)
-		return c.noopRerank(documents), nil
+	jsonStr := response[startIdx : endIdx+1]
+
+	// Parse the JSON response
+	var scores []struct {
+		ID    string  `json:"id"`
+		Score float64 `json:"score"`
 	}
 
-	// Some APIs (like LM Studio) return HTTP 200 with an error in the body
-	// Check if the response indicates an error (empty results with no success indication)
-	if len(resp.Results) == 0 && resp.Object == "" {
-		log.Printf("Warning: reranking API returned empty response (endpoint may not be supported)")
-		return c.noopRerank(documents), nil
+	if err := json.Unmarshal([]byte(jsonStr), &scores); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	// Build a map of original documents
+	docMap := make(map[string]DocumentToRerank)
+	for _, doc := range documents {
+		docMap[doc.ID] = doc
 	}
 
 	// Build reranked results
-	resultMap := make(map[string]DocumentToRerank)
-	for _, doc := range documents {
-		resultMap[doc.ID] = doc
+	scoreMap := make(map[string]float64)
+	for _, s := range scores {
+		scoreMap[s.ID] = s.Score
 	}
 
-	reranked := make([]RerankedDocument, 0, len(resp.Results))
-	for rank, result := range resp.Results {
-		originalDoc, exists := resultMap[result.Document.ID]
+	reranked := make([]RerankedDocument, 0, len(scores))
+
+	// Process scores in order
+	for _, s := range scores {
+		doc, exists := docMap[s.ID]
 		if !exists {
-			log.Printf("Warning: reranker returned unknown document ID: %s", result.Document.ID)
+			log.Printf("Warning: reranker returned unknown document ID: %s", s.ID)
 			continue
 		}
 
 		// Filter by threshold if set
-		if c.config.Threshold > 0 && result.RelevanceScore < c.config.Threshold {
+		if c.config.Threshold > 0 && s.Score < c.config.Threshold {
 			continue
 		}
 
 		// Calculate final score (blend of original and rerank scores)
 		// Using a weighted average: 30% original, 70% rerank
-		finalScore := float32(originalDoc.Score)*0.3 + float32(result.RelevanceScore)*0.7
+		finalScore := float32(doc.Score)*0.3 + float32(s.Score)*0.7
 
 		reranked = append(reranked, RerankedDocument{
-			ID:            result.Document.ID,
-			Content:       result.Document.Content,
-			OriginalScore: originalDoc.Score,
-			RerankScore:   result.RelevanceScore,
+			ID:            doc.ID,
+			Content:       doc.Content,
+			OriginalScore: doc.Score,
+			RerankScore:   s.Score,
 			FinalScore:    finalScore,
-			Rank:          rank + 1,
+			Rank:          len(reranked) + 1,
 		})
+	}
+
+	// Sort by rerank score descending
+	for i := 0; i < len(reranked)-1; i++ {
+		for j := i + 1; j < len(reranked); j++ {
+			if reranked[j].RerankScore > reranked[i].RerankScore {
+				reranked[i], reranked[j] = reranked[j], reranked[i]
+			}
+		}
+	}
+
+	// Update ranks after sorting
+	for i := range reranked {
+		reranked[i].Rank = i + 1
+	}
+
+	// If no valid scores, fall back to noop
+	if len(reranked) == 0 {
+		return c.noopRerank(documents), nil
 	}
 
 	return reranked, nil

@@ -74,9 +74,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	if namespace == "" {
 		namespace = cfg.Memory.DefaultNamespace
 	}
-	if namespace == "" {
-		namespace = "default"
-	}
+	// If namespace is still empty, don't default to "default"
+	// Leave it empty to list all namespaces
 
 	// Determine output format
 	outputFormat := listOutput
@@ -102,9 +101,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.CLI.Verbose {
-		fmt.Fprintf(os.Stderr, "Listing memories in namespace '%s'", namespace)
-		if listTag != "" {
-			fmt.Fprintf(os.Stderr, " with tag '%s'", listTag)
+		if namespace != "" {
+			fmt.Fprintf(os.Stderr, "Listing memories in namespace '%s'", namespace)
+			if listTag != "" {
+				fmt.Fprintf(os.Stderr, " with tag '%s'", listTag)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Listing memories in all namespaces")
+			if listTag != "" {
+				fmt.Fprintf(os.Stderr, " with tag '%s'", listTag)
+			}
 		}
 		fmt.Fprintf(os.Stderr, "...\n")
 	}

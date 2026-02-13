@@ -100,15 +100,11 @@ func runExport(cmd *cobra.Command, args []string) error {
 	} else {
 		// Export all memories from all namespaces
 		if cfg.CLI.Verbose {
-			fmt.Fprintf(os.Stderr, "Exporting all memories...\n")
+			fmt.Fprintf(os.Stderr, "Exporting all memories from all namespaces...\n")
 		}
-		// For now, we'll export from default namespace if none specified
-		// TODO: Implement a way to list all namespaces and export from each
-		namespace = cfg.Memory.DefaultNamespace
-		if namespace == "" {
-			namespace = "default"
-		}
-		memories, err = store.List(namespace, "", 0)
+		// Use empty namespace to list all memories
+		namespace = "all"
+		memories, err = store.List("", "", 0) // No namespace filter, no tag filter, no limit
 		if err != nil {
 			return fmt.Errorf("failed to retrieve memories: %w", err)
 		}

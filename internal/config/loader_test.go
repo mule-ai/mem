@@ -9,8 +9,9 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
-	if cfg.Memory.DefaultNamespace != "default" {
-		t.Errorf("Expected default namespace 'default', got '%s'", cfg.Memory.DefaultNamespace)
+	// No default namespace - empty means all namespaces
+	if cfg.Memory.DefaultNamespace != "" {
+		t.Errorf("Expected default namespace '', got '%s'", cfg.Memory.DefaultNamespace)
 	}
 
 	if cfg.Memory.Backend != "chromem" {
@@ -132,8 +133,9 @@ func TestInitConfig(t *testing.T) {
 		t.Fatalf("Load() failed: %v", err)
 	}
 
-	if cfg.Memory.DefaultNamespace != "default" {
-		t.Errorf("Expected default namespace 'default', got '%s'", cfg.Memory.DefaultNamespace)
+	// DefaultConfig creates config with empty default namespace (all namespaces)
+	if cfg.Memory.DefaultNamespace != "" {
+		t.Errorf("Expected default namespace '', got '%s'", cfg.Memory.DefaultNamespace)
 	}
 }
 

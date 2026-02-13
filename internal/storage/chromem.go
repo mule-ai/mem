@@ -277,6 +277,62 @@ func (s *ChromemStorage) Update(memory *models.Memory) error {
 	return nil
 }
 
+// UpdateEmbedding updates only the embedding for an existing memory
+// This is useful when regenerating embeddings with a new model
+func (s *ChromemStorage) UpdateEmbedding(id string, embedding []float32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Check if memory exists
+	existing, err := s.collection.GetByID(context.Background(), id)
+	if err != nil {
+		return fmt.Errorf("memory not found: %w", err)
+	}
+
+	// Parse existing metadata to reconstruct memory
+	// Parse tags from JSON
+	var tags []string
+	if tagsJSON, ok := existing.Metadata["tags"]; ok && tagsJSON != "" {
+		json.Unmarshal([]byte(tagsJSON), &tags)
+	}
+
+	memory := &models.Memory{
+		ID:        id,
+		Content:   existing.Content,
+		Embedding: embedding,
+		Namespace: existing.Metadata["namespace"],
+		Tags:      tags,
+	}
+
+	if createdAt, ok := existing.Metadata["created_at"]; ok {
+		memory.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	}
+	memory.UpdatedAt = time.Now()
+
+	// Create updated document
+	metadata := s.buildMetadata(memory)
+	doc := chromem.Document{
+		ID:        id,
+		Content:   existing.Content,
+		Embedding: embedding,
+		Metadata:  metadata,
+	}
+
+	// Delete old version
+	err = s.collection.Delete(context.Background(), nil, nil, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete old document: %w", err)
+	}
+
+	// Add new version with new embedding
+	err = s.collection.AddDocument(context.Background(), doc)
+	if err != nil {
+		return fmt.Errorf("failed to add updated document: %w", err)
+	}
+
+	return nil
+}
+
 // Delete removes a memory by its ID
 func (s *ChromemStorage) Delete(id string) error {
 	s.mu.Lock()
@@ -362,6 +418,44 @@ func (s *ChromemStorage) List(namespace string, tag string, limit int) ([]*model
 	// Apply limit
 	if limit > 0 && limit < len(memories) {
 		memories = memories[:limit]
+	}
+
+	return memories, nil
+}
+
+// GetAll returns all memories regardless of embedding dimension
+// This is useful for regeneration when embeddings may be corrupted
+// It uses text-based query to avoid embedding dimension issues
+func (s *ChromemStorage) GetAll() ([]*models.Memory, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Get the count of documents
+	count := s.collection.Count()
+	if count == 0 {
+		return []*models.Memory{}, nil
+	}
+
+	// Use text query with empty string to get all documents
+	// This bypasses embedding-based similarity
+	results, err := s.collection.Query(context.Background(), "", count, nil, nil)
+	if err != nil {
+		// If text query fails, try embedding-based query with current dimension
+		dummyEmbedding := make([]float32, s.embeddingDim)
+		results, err = s.collection.QueryEmbedding(context.Background(), dummyEmbedding, count, nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all memories: %w", err)
+		}
+	}
+
+	// Convert results to memories
+	memories := make([]*models.Memory, 0, len(results))
+	for _, result := range results {
+		memory, err := s.resultToMemory(result)
+		if err != nil {
+			continue
+		}
+		memories = append(memories, memory)
 	}
 
 	return memories, nil

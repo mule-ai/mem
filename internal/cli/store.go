@@ -229,31 +229,10 @@ func truncateString(s string, maxLen int) string {
 }
 
 func getConfig() (*config.Config, error) {
-	// Create a new viper instance for this command
-	v := viper.New()
-
-	// Set defaults
-	cfg := config.DefaultConfig()
-
-	// Load config file if specified
-	cfgFile := viper.GetString("config")
-	if cfgFile == "" {
-		// Try default location
-		homeDir, _ := os.UserHomeDir()
-		cfgFile = fmt.Sprintf("%s/.mem/config.yaml", homeDir)
-	}
-
-	// Check if config file exists
-	if _, err := os.Stat(cfgFile); err == nil {
-		v.SetConfigFile(cfgFile)
-		if err := v.ReadInConfig(); err != nil {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
-		}
-
-		// Unmarshal config
-		if err := v.Unmarshal(cfg); err != nil {
-			return nil, fmt.Errorf("failed to parse config file: %w", err)
-		}
+	// Use the centralized config loader which handles all defaults and aliases properly
+	cfg, err := config.Load(viper.GetString("config"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// Apply CLI flag overrides
@@ -268,11 +247,6 @@ func getConfig() (*config.Config, error) {
 	}
 	if viper.GetBool("verbose") {
 		cfg.CLI.Verbose = true
-	}
-
-	// Validate config
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return cfg, nil
